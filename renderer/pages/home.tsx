@@ -1,5 +1,7 @@
 import React from "react";
 import Head from "next/head";
+import SmsSender from "../components/sms-sender";
+
 
 import { styled } from "@mui/material";
 
@@ -16,7 +18,9 @@ function Home() {
       <Head>
         <title>SMPP Sender</title>
       </Head>
-      <Root></Root>
+      <Root>
+        <SmsSender />
+      </Root>
     </React.Fragment>
   );
 }
