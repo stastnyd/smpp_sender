@@ -60,7 +60,7 @@ const DebugLogs: React.FC<DebugLogsProps> = React.memo(({ logs }) => {
 });
 
 const Sender = () => {
-  const [sessionState, setSessionState] = useState("");
+  const [sessionState, setSessionState] = useState("Unbound");
   const [systemId, setSystemId] = useState("");
   const [password, setPassword] = useState("");
   const [host, setHost] = useState("localhost");
@@ -105,6 +105,13 @@ const Sender = () => {
 
         session.on("debug", function (type, msg, payload) {
           addDebugLog(type, msg, payload);
+        });
+
+        session.on("deliver_sm", (pdu: any) => {
+          const { short_message, ...rest } = pdu;
+          const parsedPdu = { ...rest, short_message: short_message.message };
+          addDebugLog("deliver_sm", "Deliver SM received", parsedPdu);
+          session.send(pdu.response());
         });
       }
     );
@@ -254,6 +261,9 @@ const Sender = () => {
               <div>
                 <TextField
                   label="System ID"
+                  required
+                  error={!systemId}
+                  helperText={!systemId && "System ID is required"}
                   value={systemId}
                   onChange={(e) => setSystemId(e.target.value)}
                   sx={{ marginBottom: "10px" }}
@@ -263,6 +273,9 @@ const Sender = () => {
                 <TextField
                   label="Password"
                   value={password}
+                  error={!password}
+                  helperText={!password && "Password is required"}
+                  required
                   onChange={(e) => setPassword(e.target.value)}
                   sx={{ marginBottom: "10px" }}
                 />
@@ -319,87 +332,96 @@ const Sender = () => {
               <div>
                 <div style={{ display: "flex" }}>
                   <CardContent>
-                    <h2>Source:</h2>
                     <div>
-                      <TextField
-                        label="Source Address"
-                        name="source_addr"
-                        value={smsOptions.source_addr}
-                        onChange={handleSmsOptionChange}
-                        sx={{ marginBottom: "10px" }}
-                      />
+                      <h2>Source:</h2>
+                      <div>
+                        <TextField
+                          label="Source Address"
+                          name="source_addr"
+                          value={smsOptions.source_addr}
+                          onChange={handleSmsOptionChange}
+                          required
+                          error={!smsOptions.source_addr}
+                          helperText={
+                            !smsOptions.source_addr &&
+                            "Source Address is required"
+                          }
+                          sx={{ marginBottom: "10px" }}
+                        />
+                      </div>
+                      <div>
+                        <TextField
+                          label="Source NPI"
+                          name="source_addr_npi"
+                          type="number"
+                          value={smsOptions.source_addr_npi}
+                          onChange={handleSmsOptionChange}
+                          sx={{ marginBottom: "10px" }}
+                        />
+                      </div>
+                      <div>
+                        <TextField
+                          label="Source TON"
+                          name="source_addr_ton"
+                          type="number"
+                          value={smsOptions.source_addr_ton}
+                          onChange={handleSmsOptionChange}
+                        />
+                      </div>
                     </div>
                     <div>
-                      <TextField
-                        label="Source NPI"
-                        name="source_addr_npi"
-                        type="number"
-                        value={smsOptions.source_addr_npi}
-                        onChange={handleSmsOptionChange}
-                        sx={{ marginBottom: "10px" }}
-                      />
+                      <h2>Destination:</h2>
+                      <div>
+                        <TextField
+                          label="Destination Address"
+                          name="destination_addr"
+                          value={smsOptions.destination_addr}
+                          onChange={handleSmsOptionChange}
+                          sx={{ marginBottom: "10px" }}
+                        />
+                      </div>
+                      <div>
+                        <TextField
+                          label="Destination NPI"
+                          name="dest_addr_npi"
+                          type="number"
+                          value={smsOptions.dest_addr_npi}
+                          onChange={handleSmsOptionChange}
+                          sx={{ marginBottom: "10px" }}
+                        />
+                      </div>
+                      <div>
+                        <TextField
+                          label="Destination TON"
+                          name="dest_addr_ton"
+                          type="number"
+                          value={smsOptions.dest_addr_ton}
+                          onChange={handleSmsOptionChange}
+                        />
+                      </div>
                     </div>
                     <div>
-                      <TextField
-                        label="Source TON"
-                        name="source_addr_ton"
-                        type="number"
-                        value={smsOptions.source_addr_ton}
-                        onChange={handleSmsOptionChange}
-                      />
-                    </div>
-                    <h2>Destination:</h2>
-                    <div>
-                      <TextField
-                        label="Destination Address"
-                        name="destination_addr"
-                        value={smsOptions.destination_addr}
-                        onChange={handleSmsOptionChange}
-                        sx={{ marginBottom: "10px" }}
-                      />
-                    </div>
-                    <div>
-                      <TextField
-                        label="Destination NPI"
-                        name="dest_addr_npi"
-                        type="number"
-                        value={smsOptions.dest_addr_npi}
-                        onChange={handleSmsOptionChange}
-                        sx={{ marginBottom: "10px" }}
-                      />
-                    </div>
-                    <div>
-                      <TextField
-                        label="Destination TON"
-                        name="dest_addr_ton"
-                        type="number"
-                        value={smsOptions.dest_addr_ton}
-                        onChange={handleSmsOptionChange}
-                      />
-                    </div>
-                  </CardContent>
-
-                  <CardContent sx={{ flex: 1 }}>
-                    <h2>Coding:</h2>
-                    <div>
-                      <TextField
-                        label="Data Coding"
-                        name="data_coding"
-                        type="number"
-                        value={smsOptions.data_coding}
-                        onChange={handleSmsOptionChange}
-                        sx={{ marginBottom: "10px" }}
-                      />
-                    </div>
-                    <div>
-                      <TextField
-                        label="ESM Class"
-                        name="esm_class"
-                        type="number"
-                        value={smsOptions.esm_class}
-                        onChange={handleSmsOptionChange}
-                        sx={{ marginBottom: "10px" }}
-                      />
+                      <h2>Coding:</h2>
+                      <div>
+                        <TextField
+                          label="Data Coding"
+                          name="data_coding"
+                          type="number"
+                          value={smsOptions.data_coding}
+                          onChange={handleSmsOptionChange}
+                          sx={{ marginBottom: "10px" }}
+                        />
+                      </div>
+                      <div>
+                        <TextField
+                          label="ESM Class"
+                          name="esm_class"
+                          type="number"
+                          value={smsOptions.esm_class}
+                          onChange={handleSmsOptionChange}
+                          sx={{ marginBottom: "10px" }}
+                        />
+                      </div>
                     </div>
                   </CardContent>
                 </div>
@@ -418,7 +440,7 @@ const Sender = () => {
               onChange={handleSmsOptionChange}
               multiline
               rows={4}
-              sx={{ marginBottom: "10px" }}
+              sx={{ marginBottom: "10px", width: "100%" }}
             />
           </div>
           <Button variant="contained" color="primary" onClick={handleSendSMS}>
