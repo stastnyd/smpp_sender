@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button, TextField, Card, CardContent } from "@mui/material";
 import smpp from "smpp";
+import Store from 'electron-store';
 
 type DebugLogsProps = {
   logs: Array<{
@@ -10,6 +11,18 @@ type DebugLogsProps = {
     timestamp: string;
   }>;
 };
+
+interface SmsOptions {
+  source_addr: string;
+  destination_addr: string;
+  source_addr_ton: number;
+  source_addr_npi: number;
+  dest_addr_ton: number;
+  dest_addr_npi: number;
+  data_coding: number;
+  esm_class: number;
+  short_message: string;
+}
 
 const DebugLogs: React.FC<DebugLogsProps> = React.memo(({ logs }) => {
   return (
@@ -68,7 +81,7 @@ const Sender = () => {
   const [session, setSession] = useState(null);
   const [bound, setBound] = useState(false);
   const [debugLogs, setDebugLogs] = useState([]);
-  const [smsOptions, setSmsOptions] = useState({
+  const [smsOptions, setSmsOptions] = useState<SmsOptions>({
     source_addr: "",
     destination_addr: "",
     source_addr_ton: 5,
@@ -250,6 +263,17 @@ const Sender = () => {
     return parts;
   };
 
+  const handleSaveOptions = () => {
+    const store = new Store({ name: "options" });
+    store.set("smsOptions", smsOptions);
+  }
+
+  const handleLoadOptions = () => {
+    const store = new Store({ name: "options" });
+    const options = store.get("smsOptions", smsOptions);
+    setSmsOptions(options as SmsOptions);
+  }
+
   return (
     <div>
       <div style={{ display: "flex" }}>
@@ -332,6 +356,18 @@ const Sender = () => {
 
         <Card sx={{ margin: "20px", flex: "1 1 50%", minWidth: 0 }}>
           <CardContent>
+            <Button 
+                variant="contained"
+                color="primary" 
+                onClick={handleSaveOptions}>
+                    Save options
+            </Button>
+            <Button 
+                variant="contained"
+                color="primary" 
+                onClick={handleLoadOptions}>
+                    Load options
+            </Button>
             <h2>General message settings:</h2>
             <form>
               <div>
