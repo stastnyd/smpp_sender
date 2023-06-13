@@ -103,9 +103,6 @@ const Sender = () => {
           }
         );
 
-        session.on("debug", function (type, msg, payload) {
-          addDebugLog(type, msg, payload);
-        });
 
         session.on("deliver_sm", (pdu: any) => {
           const { short_message, ...rest } = pdu;
@@ -184,7 +181,7 @@ const Sender = () => {
       const parts = divideIntoParts(short_message, maxMessageLength);
 
       parts.forEach((part, index) => {
-        const udh = `050003${index + 1}${parts.length}`;
+        const udh =  Buffer.from([5, 0, 3, 68, parts.length, index+1]);
 
         session.submit_sm(
           {
@@ -195,12 +192,15 @@ const Sender = () => {
             dest_addr_ton,
             dest_addr_npi,
             data_coding,
-            esm_class: esm_class | 0x40,
-            short_message: part,
-            message_payload: udh + part,
+            esm_class: esm_class,
+            short_message: {
+              udh: udh,
+              message: part
+            }
           },
           (pdu) => {
             if (pdu.command_status === 0) {
+              //TODO - Add to UI message status
               console.log(
                 `Part ${index + 1} of ${parts.length} sent successfully`
               );
@@ -227,6 +227,7 @@ const Sender = () => {
           short_message,
         },
         (pdu) => {
+              //TODO - Add to UI message status
           if (pdu.command_status === 0) {
             console.log("SMS message sent successfully");
           } else {
@@ -284,6 +285,8 @@ const Sender = () => {
                 <TextField
                   label="Host"
                   value={host}
+                  error={!host}
+                  helperText={!host && "Host is required"}
                   onChange={(e) => setHost(e.target.value)}
                   sx={{ marginBottom: "10px" }}
                 />
@@ -293,6 +296,8 @@ const Sender = () => {
                   label="Port"
                   type="number"
                   value={port}
+                  error={!port}
+                  helperText={!port && "Port is required"}
                   onChange={(e) => setPort(parseInt(e.target.value))}
                   sx={{ marginBottom: "10px" }}
                 />
@@ -376,6 +381,12 @@ const Sender = () => {
                           label="Destination Address"
                           name="destination_addr"
                           value={smsOptions.destination_addr}
+                          required
+                          error={!smsOptions.destination_addr}
+                          helperText={
+                            !smsOptions.destination_addr &&
+                            "Source Address is required"
+                          }
                           onChange={handleSmsOptionChange}
                           sx={{ marginBottom: "10px" }}
                         />
