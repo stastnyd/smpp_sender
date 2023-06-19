@@ -1,73 +1,35 @@
 import React, { useState, useEffect } from "react";
-import { Button, TextField, Card, CardContent } from "@mui/material";
+import DebugLogs from "./debug-logs";
+import { count } from "sms-length";
+import {
+  Button,
+  TextField,
+  Card,
+  CardContent,
+  FormControl,
+  Select,
+  InputLabel,
+  MenuItem,
+  Paper,
+  tabScrollButtonClasses,
+} from "@mui/material";
 import smpp from "smpp";
-
-type DebugLogsProps = {
-  logs: Array<{
-    type: string;
-    msg: string;
-    payload: Record<string, string | number>;
-    timestamp: string;
-  }>;
-};
-
-const DebugLogs: React.FC<DebugLogsProps> = React.memo(({ logs }) => {
-  return (
-    <Card
-      variant="outlined"
-      sx={{
-        margin: "20px",
-        overflow: "auto",
-        padding: "5px",
-        textAlign: "left",
-      }}
-    >
-      <CardContent>
-        {logs.map((log, index) => (
-          <div
-            key={index}
-            style={{
-              padding: "5px",
-              borderBottom: "1px solid #ccc",
-              borderRadius: "4px",
-              marginTop: "5px",
-              fontFamily: "monospace",
-            }}
-          >
-            <p style={{ margin: "1px" }}>
-              <strong>Timestamp:</strong> {log.timestamp}
-            </p>{" "}
-            <p style={{ margin: "1px" }}>
-              <strong>Type:</strong> {log.type}
-            </p>
-            <p style={{ margin: "1px" }}>
-              {" "}
-              <strong>Message:</strong> {log.msg}
-            </p>
-            <strong>Payload:</strong>
-            <ul style={{ listStyleType: "none", padding: 0, margin: 0 }}>
-              {Object.entries(log.payload ?? {}).map(([key, value]) => (
-                <li key={key}>
-                  {key}: {String(value)}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-});
 
 const Sender = () => {
   const [sessionState, setSessionState] = useState("Unbound");
-  const [systemId, setSystemId] = useState("");
-  const [password, setPassword] = useState("");
-  const [host, setHost] = useState("localhost");
-  const [port, setPort] = useState(2775);
   const [session, setSession] = useState(null);
   const [bound, setBound] = useState(false);
   const [debugLogs, setDebugLogs] = useState([]);
+  const [messageStats, setMessageStats] = useState(null);
+
+  const [connection, setConnection] = useState({
+    system_id: "",
+    password: "",
+    host: "localhost",
+    port: 2775,
+    connection_type: "trx",
+  });
+
   const [smsOptions, setSmsOptions] = useState({
     source_addr: "",
     destination_addr: "",
@@ -80,34 +42,54 @@ const Sender = () => {
     short_message: "",
   });
 
+  useEffect(() => {
+    setMessageStats(count(smsOptions.short_message));
+  }, [smsOptions.short_message]);
+
   const handleBind = () => {
     const session = smpp.connect(
       {
-        url: `smpp://${host}:${port}`,
+        url: `smpp://${connection.host}:${connection.port}`,
         auto_enquire_link_period: 10000,
-        debug: true,
+        debug: tabScrollButtonClasses,
+        connectionType: connection.connection_type,
       },
       () => {
         session.bind_transceiver(
           {
-            system_id: systemId,
-            password: password,
+            system_id: connection.system_id,
+            password: connection.password,
           },
 
           (pdu) => {
             if (pdu.command_status === 0) {
               setSession(session);
               setBound(true);
+              addDebugLog("session", "Session Bound", pdu);
               setSessionState("Session bound");
+            } else {
+              addDebugLog("session", "Connection Error", pdu);
             }
           }
         );
-
 
         session.on("deliver_sm", (pdu: any) => {
           const { short_message, ...rest } = pdu;
           const parsedPdu = { ...rest, short_message: short_message.message };
           addDebugLog("deliver_sm", "Deliver SM received", parsedPdu);
+          session.send(pdu.response());
+        });
+
+        session.on("error", function (error) {
+          addDebugLog("session", "Error", error);
+        });
+
+        session.on("enquire_link_resp", function (pdu) {
+          addDebugLog("enquire_link_resp", "enquire_link_resp", pdu);
+        });
+
+        session.on("enquire_link", function (pdu) {
+          addDebugLog("enquire_link", "enquire_link", pdu);
           session.send(pdu.response());
         });
       }
@@ -149,17 +131,9 @@ const Sender = () => {
     });
   };
 
-  const handleSmsOptionChange = (e) => {
-    const { name, value } = e.target;
-    setSmsOptions((prevOptions) => ({
-      ...prevOptions,
-      [name]: value,
-    }));
-  };
-
   const handleSendSMS = () => {
     if (!session || !bound) {
-      console.log("Session is not bound");
+      addDebugLog("session", "Not Bound", "");
       return;
     }
 
@@ -175,13 +149,15 @@ const Sender = () => {
       short_message,
     } = smsOptions;
 
-    const maxMessageLength = 160;
+    const smsCount = count(short_message);
 
-    if (short_message.length > maxMessageLength) {
-      const parts = divideIntoParts(short_message, maxMessageLength);
-
+    if (smsCount.messages > 1) {
+      const parts = divideIntoParts(
+        short_message,
+        smsCount.characterPerMessage
+      );
       parts.forEach((part, index) => {
-        const udh =  Buffer.from([5, 0, 3, 68, parts.length, index+1]);
+        const udh = Buffer.from([5, 0, 3, 68, parts.length, index + 1]);
 
         session.submit_sm(
           {
@@ -195,18 +171,25 @@ const Sender = () => {
             esm_class: esm_class,
             short_message: {
               udh: udh,
-              message: part
-            }
+              message: part,
+            },
           },
           (pdu) => {
+            addDebugLog("submit_sm", "Message submitted", pdu);
             if (pdu.command_status === 0) {
               //TODO - Add to UI message status
-              console.log(
-                `Part ${index + 1} of ${parts.length} sent successfully`
+
+              addDebugLog(
+                "submit_sm",
+                `Message Part ${index + 1} of ${
+                  parts.length
+                } sent successfully`,
+                pdu
               );
             } else {
-              console.log(
-                `Failed to send part ${index + 1} of ${parts.length}:`,
+              addDebugLog(
+                "submit_sm",
+                `Failed to send part ${index + 1} of ${parts.length}`,
                 pdu
               );
             }
@@ -227,11 +210,11 @@ const Sender = () => {
           short_message,
         },
         (pdu) => {
-              //TODO - Add to UI message status
+          addDebugLog("submit_sm", "Message submitted", pdu);
           if (pdu.command_status === 0) {
-            console.log("SMS message sent successfully");
+            addDebugLog("submit_sm", "Message sent success", pdu);
           } else {
-            console.log("Failed to send SMS message:", pdu);
+            addDebugLog("submit_sm", "Failed to send message", pdu);
           }
         }
       );
@@ -250,6 +233,21 @@ const Sender = () => {
     return parts;
   };
 
+  const handleConnectionChange = (e) => {
+    const { name, value } = e.target;
+    setConnection((prevConnection) => ({
+      ...prevConnection,
+      [name]: value,
+    }));
+  };
+
+  const handleSmsOptionChange = (e) => {
+    const { name, value } = e.target;
+    setSmsOptions((prevOptions) => ({
+      ...prevOptions,
+      [name]: value,
+    }));
+  };
   return (
     <div>
       <div style={{ display: "flex" }}>
@@ -257,52 +255,76 @@ const Sender = () => {
           <CardContent>
             <h2>Connection:</h2>
 
-            <form>
+            <FormControl>
               {/* Connection section */}
               <div>
                 <TextField
                   label="System ID"
+                  name="system_id"
                   required
-                  error={!systemId}
-                  helperText={!systemId && "System ID is required"}
-                  value={systemId}
-                  onChange={(e) => setSystemId(e.target.value)}
+                  error={!connection.system_id}
+                  helperText={!connection.system_id && "System ID is required"}
+                  value={connection.system_id}
+                  onChange={handleConnectionChange}
                   sx={{ marginBottom: "10px" }}
                 />
               </div>
+
               <div>
                 <TextField
                   label="Password"
-                  value={password}
-                  error={!password}
-                  helperText={!password && "Password is required"}
+                  name="password"
+                  value={connection.password}
+                  error={!connection.password}
+                  helperText={!connection.password && "Password is required"}
                   required
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={handleConnectionChange}
                   sx={{ marginBottom: "10px" }}
                 />
               </div>
               <div>
                 <TextField
                   label="Host"
-                  value={host}
-                  error={!host}
-                  helperText={!host && "Host is required"}
-                  onChange={(e) => setHost(e.target.value)}
+                  name="host"
+                  value={connection.host}
+                  error={!connection.host}
+                  helperText={!connection.host && "Host is required"}
+                  onChange={handleConnectionChange}
                   sx={{ marginBottom: "10px" }}
                 />
               </div>
               <div>
                 <TextField
                   label="Port"
+                  name="port"
                   type="number"
-                  value={port}
-                  error={!port}
-                  helperText={!port && "Port is required"}
-                  onChange={(e) => setPort(parseInt(e.target.value))}
+                  value={connection.port}
+                  error={!connection.port}
+                  helperText={!connection.port && "Port is required"}
+                  onChange={handleConnectionChange}
                   sx={{ marginBottom: "10px" }}
                 />
               </div>
-
+              <div>
+                <FormControl fullWidth>
+                  <InputLabel id="connection-type-label">
+                    Connection Type
+                  </InputLabel>
+                  <Select
+                    labelId="connection-type-label"
+                    id="connection-type"
+                    name="connection_type"
+                    value={connection.connection_type || "trx"}
+                    onChange={handleConnectionChange}
+                    label="Connection type"
+                    sx={{ marginBottom: "10px", color: "black" }}
+                  >
+                    <MenuItem value={"tx"}>TX</MenuItem>
+                    <MenuItem value={"rx"}>RX</MenuItem>
+                    <MenuItem value={"trx"}>TRX</MenuItem>
+                  </Select>
+                </FormControl>
+              </div>
               {bound ? (
                 <Button
                   variant="contained"
@@ -320,13 +342,12 @@ const Sender = () => {
                   Bind
                 </Button>
               )}
-
               {/* Session state */}
               <div>
                 <h2>Session State:</h2>
                 <p color="black">{sessionState}</p>
               </div>
-            </form>
+            </FormControl>
           </CardContent>
         </Card>
 
@@ -441,23 +462,68 @@ const Sender = () => {
           </CardContent>
         </Card>
       </div>
-      <Card>
-        <CardContent>
-          <div>
-            <TextField
-              label="Short Message"
-              name="short_message"
-              value={smsOptions.short_message}
-              onChange={handleSmsOptionChange}
-              multiline
-              rows={4}
-              sx={{ marginBottom: "10px", width: "100%" }}
-            />
-          </div>
+      <Card
+        variant="outlined"
+        sx={{
+          margin: "20px",
+          overflow: "auto",
+          padding: "5px",
+          textAlign: "left",
+          flex: "1 1 50%",
+          minWidth: 0,
+          display: "flex",
+          width: "100%",
+        }}
+      >
+        <CardContent
+          sx={{
+            width: "50%",
+            paddingRight: "10px",
+          }}
+        >
+          <TextField
+            label="Message"
+            name="short_message"
+            value={smsOptions.short_message}
+            onChange={handleSmsOptionChange}
+            multiline
+            rows={10}
+            sx={{ marginBottom: "10px", width: "100%" }}
+          />
+
           <Button variant="contained" color="primary" onClick={handleSendSMS}>
             Send SMS
           </Button>
         </CardContent>
+
+        <Paper
+          sx={{
+            width: "50%",
+            padding: "15px",
+            margin: "15px",
+            textAlign: "left",
+            fontFamily: "monospace",
+          }}
+        >
+          <p style={{ margin: "1px" }}>
+            Encoding: {messageStats?.encoding || "N/A"}
+          </p>
+          <p style={{ margin: "1px" }}>
+            Length: {messageStats?.length || "N/A"}
+          </p>
+          <p style={{ margin: "1px" }}>
+            Characters per Message: {messageStats?.characterPerMessage || "N/A"}
+          </p>
+          <p style={{ margin: "1px" }}>
+            In Current Message: {messageStats?.inCurrentMessage || "N/A"}
+          </p>
+          <p style={{ margin: "1px" }}>
+            Remaining: {messageStats?.remaining || "N/A"}
+          </p>
+          <p style={{ margin: "1px" }}>
+            Messages: {messageStats?.messages || "N/A"}
+          </p>
+        </Paper>
       </Card>
 
       <Card>
