@@ -12,7 +12,9 @@
   "dependencies": {
     "electron-serve": "^1.1.0",
     "electron-store": "^8.1.0",
-    "smpp": "^0.6.0-rc.4"
+    "react-phone-number-input": "^3.2.23",
+    "smpp": "^0.6.0-rc.4",
+    "sms-length": "^0.1.2"
   },
   "devDependencies": {
     "@emotion/cache": "^11.10.3",
