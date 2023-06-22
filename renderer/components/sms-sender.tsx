@@ -20,6 +20,7 @@ const Sender = () => {
   const [session, setSession] = useState(null);
   const [bound, setBound] = useState(false);
   const [debugLogs, setDebugLogs] = useState([]);
+  const [tlvs, setTlvs] = React.useState([]);
   const [messageStats, setMessageStats] = useState(null);
   const [currentTab, setCurrentTab] = useState(0);
   const [smsOptions, setSmsOptions] = useState({
@@ -65,8 +66,13 @@ const Sender = () => {
               setSession(session);
               setBound(true);
               addDebugLog("session", "Session Bound", pdu);
-              setSessionState("Session bound");
+              setSessionState(
+                `Session bound, command status ${pdu.command_status}`
+              );
             } else {
+              setSessionState(
+                `Connection error, command status ${pdu.command_status}`
+              );
               addDebugLog("session", "Connection Error", pdu);
             }
           }
@@ -87,6 +93,13 @@ const Sender = () => {
           addDebugLog("enquire_link_resp", "enquire_link_resp", pdu);
         });
 
+        session.on("unbind_resp", function (pdu) {
+          setSessionState(
+            `Session unbinded, command status ${pdu.command_status}`
+          );
+          addDebugLog("unbind_resp", "unbind_resp", pdu);
+        });
+
         session.on("enquire_link", function (pdu) {
           addDebugLog("enquire_link", "enquire_link", pdu);
           session.send(pdu.response());
@@ -103,11 +116,11 @@ const Sender = () => {
 
   const handleUnbind = () => {
     if (session) {
+      console.log;
       session.unbind(() => {
         session.close();
         setSession(null);
         setBound(false);
-        setSessionState("Unbinded");
       });
     }
   };
@@ -250,6 +263,10 @@ const Sender = () => {
     }));
   };
 
+  const handleAddTlv = (newTlv) => {
+    setTlvs([...tlvs, { id: tlvs.length + 1, ...newTlv }]);
+  };
+
   const tabs = [
     {
       label: "Message",
@@ -272,8 +289,12 @@ const Sender = () => {
               padding: "15px",
               margin: "15px",
               textAlign: "left",
+              borderColor: "white",
+              boxShadow: "none",
             }}
+            component="fieldset"
           >
+            <legend>Connection</legend>
             <Connection
               connection={connection}
               handleConnectionChange={handleConnectionChange}
@@ -289,8 +310,12 @@ const Sender = () => {
               padding: "15px",
               margin: "15px",
               textAlign: "left",
+              borderColor: "white",
+              boxShadow: "none",
             }}
+            component="fieldset"
           >
+            <legend>Message Settings</legend>
             <GeneralMessageSettings
               smsOptions={smsOptions}
               handleSmsOptionChange={handleSmsOptionChange}

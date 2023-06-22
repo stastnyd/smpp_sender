@@ -7,7 +7,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Typography,
+  Box,
 } from "@mui/material";
 
 interface ConnectionProps {
@@ -29,10 +29,18 @@ const Connection: React.FC<ConnectionProps> = ({
   sessionState,
   bound,
 }) => (
-  <CardContent>
-    <Typography variant="h5" align="center">
-      Connection
-    </Typography>
+  <CardContent
+    sx={{
+      margin: "20px",
+      overflow: "auto",
+      padding: "5px",
+      textAlign: "left",
+      flex: "1 1 50%",
+      minWidth: 0,
+      display: "flex",
+      width: "100%",
+    }}
+  >
     <FormControl>
       <TextField
         label="System ID"
@@ -118,11 +126,23 @@ const Connection: React.FC<ConnectionProps> = ({
           Bind
         </Button>
       )}
-      <div>
-        <h2>Session State:</h2>
-        <p color="black">{sessionState}</p>
-      </div>
     </FormControl>
+    <Box
+      sx={{
+        width: "50%",
+        padding: "15px",
+        margin: "15px",
+        textAlign: "left",
+        fontFamily: "monospace",
+        borderColor: "white",
+        boxShadow: "none",
+      }}
+      component="fieldset"
+    >
+      <legend>Session State</legend>
+
+      <p color="black">{sessionState}</p>
+    </Box>
   </CardContent>
 );
 

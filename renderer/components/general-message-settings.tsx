@@ -24,9 +24,6 @@ const GeneralMessageSettings: React.FC<GeneralMessageSettingsProps> = ({
   return (
     <FormControl>
       <CardContent>
-        <Typography variant="h5" align="center">
-          Message Settings
-        </Typography>
         <TextField
           label="Source Address"
           name="source_addr"
@@ -80,7 +77,6 @@ const GeneralMessageSettings: React.FC<GeneralMessageSettingsProps> = ({
           type="number"
           value={smsOptions.dest_addr_npi}
           onChange={handleSmsOptionChange}
-          sx={{ margin: "10px" }}
           size="small"
           sx={{ margin: "10px" }}
         />
