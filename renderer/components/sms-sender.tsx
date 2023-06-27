@@ -11,16 +11,37 @@ import {
   Card,
   CardContent,
   tabScrollButtonClasses,
+  TextField,
   Paper,
+  Button,
+  Table,
+  TableContainer,
+  TableRow,
+  TableCell,
+  TableBody,
+  TableHead,
 } from "@mui/material";
 import smpp from "smpp";
+
+interface TLV {
+  tag: string;
+  value: string;
+  type: string;
+  description: string;
+}
 
 const Sender = () => {
   const [sessionState, setSessionState] = useState("Unbound");
   const [session, setSession] = useState(null);
   const [bound, setBound] = useState(false);
   const [debugLogs, setDebugLogs] = useState([]);
-  const [tlvs, setTlvs] = React.useState([]);
+  const [tlvs, setTlvs] = useState([]);
+  const [tlvData, setTlvData] = useState({
+    tag: "",
+    value: "",
+    type: "",
+    description: "",
+  });
   const [messageStats, setMessageStats] = useState(null);
   const [currentTab, setCurrentTab] = useState(0);
   const [smsOptions, setSmsOptions] = useState({
@@ -189,6 +210,7 @@ const Sender = () => {
               udh: udh,
               message: part,
             },
+            tlvs: tlvs,
           },
           (pdu) => {
             addDebugLog("submit_sm", "Message submitted", pdu);
@@ -222,6 +244,7 @@ const Sender = () => {
           data_coding,
           esm_class,
           short_message,
+          tlvs: tlvs,
         },
         (pdu) => {
           addDebugLog("submit_sm", "Message submitted", pdu);
@@ -262,11 +285,24 @@ const Sender = () => {
       [name]: value,
     }));
   };
-
-  const handleAddTlv = (newTlv) => {
-    setTlvs([...tlvs, { id: tlvs.length + 1, ...newTlv }]);
+  const handleAddTlv = () => {
+    setTlvs((prevTlvs) => [...prevTlvs, tlvData]);
+    console.log(tlvs);
+    setTlvData({
+      tag: "",
+      value: "",
+      type: "",
+      description: "",
+    });
   };
+  const handleTlvFieldChange = (e) => {
+    const { name, value } = e.target;
 
+    setTlvData((prevTlvData) => ({
+      ...prevTlvData,
+      [name]: value,
+    }));
+  };
   const tabs = [
     {
       label: "Message",
@@ -285,7 +321,7 @@ const Sender = () => {
         <Card style={{ display: "flex" }}>
           <Paper
             sx={{
-              width: "50%",
+              width: "30%",
               padding: "15px",
               margin: "15px",
               textAlign: "left",
@@ -306,10 +342,10 @@ const Sender = () => {
           </Paper>
           <Paper
             sx={{
-              width: "50%",
+              width: "40%",
               padding: "15px",
               margin: "15px",
-              textAlign: "left",
+              textAlign: "center",
               borderColor: "white",
               boxShadow: "none",
             }}
@@ -321,13 +357,105 @@ const Sender = () => {
               handleSmsOptionChange={handleSmsOptionChange}
             />
           </Paper>
+          <Box
+            sx={{
+              width: "40%",
+              padding: "15px",
+              margin: "15px",
+              textAlign: "left",
+              borderColor: "white",
+              boxShadow: "none",
+            }}
+            component="fieldset"
+          >
+            <legend>TLV Settings</legend>
+            <Box
+              sx={{
+                padding: "15px",
+                margin: "15px",
+                textAlign: "left",
+                borderColor: "white",
+                boxShadow: "none",
+              }}
+            >
+              <div>
+                <div>
+                  <TextField
+                    label="Tag"
+                    name="tag"
+                    value={tlvData.tag}
+                    onChange={handleTlvFieldChange}
+                    sx={{ marginBottom: "10px" }}
+                  />
+                </div>
+                <div>
+                  <TextField
+                    label="Value"
+                    name="value"
+                    value={tlvData.value}
+                    onChange={handleTlvFieldChange}
+                    sx={{ marginBottom: "10px" }}
+                  />
+                </div>
+                <div>
+                  <TextField
+                    label="Type"
+                    name="type"
+                    value={tlvData.type}
+                    onChange={handleTlvFieldChange}
+                    sx={{ marginBottom: "10px" }}
+                  />
+                </div>
+                <div>
+                  <TextField
+                    label="Description"
+                    name="description"
+                    value={tlvData.description}
+                    onChange={handleTlvFieldChange}
+                    sx={{ marginBottom: "10px" }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <h2>Added TLVs:</h2>
+                <TableContainer component={Paper}>
+                  <Table aria-label="simple table">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Tag</TableCell>
+                        <TableCell align="right">Value</TableCell>
+                        <TableCell align="right">Type</TableCell>
+                        <TableCell align="right">Description</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {tlvs.map((tlv, index) => (
+                        <TableRow key={index}>
+                          <TableCell component="th" scope="row">
+                            {tlv.tag}
+                          </TableCell>
+                          <TableCell align="right">{tlv.value}</TableCell>
+                          <TableCell align="right">{tlv.type}</TableCell>
+                          <TableCell align="right">{tlv.description}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </div>
+            </Box>
+            <Button variant="contained" color="primary" onClick={handleAddTlv}>
+              Add TLV
+            </Button>
+          </Box>
         </Card>
       ),
     },
   ];
   return (
     <div>
-      <Box sx={{ width: "100%" }}>
+      <Box>
         <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
           <Tabs
             value={currentTab}
@@ -341,8 +469,6 @@ const Sender = () => {
         </Box>
         {tabs[currentTab].component}
       </Box>
-
-      <div></div>
 
       <Card>
         <CardContent>
